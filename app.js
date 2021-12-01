@@ -1,7 +1,10 @@
 const express = require('express');
+const morgan = require('morgan');
+const usersRouter = require('./backend/routers/usersRouter');
 
 const app = express();
 app.use(express.json());
+app.use(morgan());
 
 app.use('/', usersRouter);
 
@@ -19,9 +22,5 @@ app.use('/', usersRouter);
 
 // Error handler 404 endpoint not found
 
-
-// Tests:
-// Run all tests (tokenExpire.test takes 10s) - CLI command - npm run test.
-// Run single test suite - CLI command - npm run test -- SomeTestFileToRun.
 
 module.exports = app;

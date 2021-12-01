@@ -1,16 +1,30 @@
 const express = require('express');
-const jwt = require('jsonwebtoken')
-
+const jwt = require('jsonwebtoken');
+const { encrpytPassword, checkDecrypt } = require('../helpers/bcryptFunctions');
 const router = express.Router();
+
 // {email, name, password, isAdmin}
 const USERS = [];
 // {email, info}
 const INFORMATION = [];
 
+const REFRESHTOKENS = [];
+
+
+const admin = {
+    email: "admin@email.com",
+    name: "admin",
+    password: encrpytPassword('Rc123456!'),
+    isAdmin: true
+}
+
 // Signing up to the server
 router.post('/users/register', (req, res) => {
     const { email, user, password } = req.body;
+    // If user name isn't taken yet
     if(USERS.every(_user => _user.user !== user)){
+        const encrpytedPassword = encrpytPassword(password);
+        USERS.push({ email, name: user, password, isAdmin: false });
         INFORMATION.push({email, info: `${user} info`});
         res.status(201).send('Register Success');
     }
@@ -19,13 +33,16 @@ router.post('/users/register', (req, res) => {
     }
 })
 
-// Logining in to the server
+// Logging in to the server
 router.post('/users/login', (req, res) => {
     const { email, password } = req.body;
-    const loginUser = USERS.find(user => user.email === email || user.password === password);
+    const loginUser = USERS.find(user => user.email === email);
     if(!loginUser) res.status(404).send('cannot find user');
-    if(loginUser.email === email && loginUser.password === password){
-        // res.status(200).json({accessToken, refreshToken, email, name, isAdmin})
+    if(checkDecrypt(password, loginUser.password)){
+        const accessToken = jwt.sign(loginUser.user, secret);
+        const refreshToken = accessToken;
+        REFRESHTOKENS.push(refreshToken);
+        res.status(200).json({accessToken, refreshToken, email, name: loginUser.user, isAdmin: false});
     }
     else {
         res.status(403).send('User or Password incorrect');
@@ -34,9 +51,9 @@ router.post('/users/login', (req, res) => {
 
 // Validating access token
 router.post('/users/tokenValidate', (req, res) => {
-    const token = req.headers.Authorization;
-    if(!token) res.status(401).send('Access Token Required');
-    jwt.verify(token, secret, (err, user) => {
+    const accessToken = req.headers.Authorization;
+    if(!accessToken) res.status(401).send('Access Token Required');
+    jwt.verify(accessToken, secret, (err, user) => {
         err ?
             res.status(403).send('Invalid Access Token') :
             res.json({valid: true});
@@ -45,47 +62,48 @@ router.post('/users/tokenValidate', (req, res) => {
 
 // Access user info with token
 router.get('/api/v1/information', (req, res) => {
-    const token = req.headers.Authorization;
-    if(!token) res.status(401).send('Access Token Required');
-    jwt.verify(token, secret, (err, user) => {
+    const accessToken = req.headers.Authorization;
+    if(!accessToken) res.status(401).send('Access Token Required');
+    jwt.verify(accessToken, secret, (err, user) => {
         err ?
             res.status(403).send('Invalid Access Token') :
             res.json({email: user.email, info: user.info});
     })
 })
 
+// Sends a new access token to a valid refresh token.
 router.post('/users/token', (req, res) => {
-    const token = req.body.token;
-    if(!token) res.status(401).send('Refresh Token Required');
-    // jwt.verify(token, secret, (err, user) => {
-    // renew
-        err ?
-            res.status(403).send('Invalid Refresh Token') :
-            res.json({email: user.email, info: user.info});
-    // })
+    const refreshToken = req.body.token;
+    if(!refreshToken) res.status(401).send('Refresh Token Required');
+    REFRESHTOKENS.find(token => token === refreshToken) ?
+        res.status(200).send(refreshToken) :
+        res.status(403).send('Invalid Refresh Token');
 })
 
 // Logging out
 router.post('users/logout', (req, res) => {
-    const token = req.body.token;
-    if(!token) res.status(400).send('Refresh Token Required');
-    //log out?
-    jwt.verify(token, secret, (err, user) => {
-        err ?
-            res.status(400).send('Invalid Refresh Token') :
-            res.send('User Logged Out Succesfully');
+    const refreshToken = req.body.token;
+    if(!refreshToken) res.status(400).send('Refresh Token Required');
+    REFRESHTOKENS.map(token => {
+        if(token === refreshToken){
+            res.send('User Logged Out Successfully');
+        }
     })
+    res.status(400).send('Invalid Refresh Token');
 })
 
 // Sends users array for an admin token
 router.get('/api/v1/users', (req, res) => {
-    const token = req.headers.Authorization;
-    if(!token) res.status(401).send('Access Token Required');
-    jwt.verify(token, secret, (err, user) => {
-        !user.isAdmin ?
-            res.status(403).send('Invalid Access Token') :
-            res.json({USERS})
+    const accessToken = req.headers.Authorization;
+    if(!accessToken) res.status(401).send('Access Token Required');
+    jwt.verify(accessToken, secret, (err, user) => {
+        if(err) res.status(403).send('Invalid Access Token');
+        user.isAdmin ?
+            res.json({USERS}) :
+            res.status(403).send('Invalid Access Token');
     })
 })
 
 router.options('/', /* stuff */)
+
+module.exports = router;
