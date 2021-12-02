@@ -12,6 +12,7 @@ const REFRESHTOKENS = [];
 
 const secret = 'ktuKOD6zt6';
 
+let adminAdded = false;
 const addAdmin = async () => {
     const admin = {
         email: "admin@email.com",
@@ -20,8 +21,13 @@ const addAdmin = async () => {
         isAdmin: true
     }
     USERS.push(admin);
+    adminAdded = true;
 }
-addAdmin();
+router.use(async (req, res, next) => {
+    if(!adminAdded) await addAdmin();
+    next();
+})
+
 
 // Signing up to the server
 router.post('/users/register', async (req, res) => {
@@ -42,12 +48,12 @@ router.post('/users/register', async (req, res) => {
 router.post('/users/login', async (req, res) => {
     const { email, password } = req.body;
     const loginUser = USERS.find(user => user.email === email);
-    if(!loginUser) res.status(404).send('cannot find user');
+    if(!loginUser) return res.status(404).send('cannot find user');
     if(await checkDecrypt(`${password}`, `${loginUser.password}`)){
-        const accessToken = jwt.sign(loginUser.name, secret);
+        const accessToken = jwt.sign(loginUser, secret);
         const refreshToken = accessToken;
         REFRESHTOKENS.push(refreshToken);
-        res.status(200).json({accessToken, refreshToken, email, name: loginUser.name, isAdmin: false});
+        res.status(200).json({accessToken, refreshToken, email, name: loginUser.name, isAdmin: loginUser.isAdmin});
     }
     else {
         res.status(403).send('User or Password incorrect');
@@ -56,9 +62,10 @@ router.post('/users/login', async (req, res) => {
 
 // Validating access token
 router.post('/users/tokenValidate', (req, res) => {
-    const accessToken = req.headers.Authorization;
-    if(!accessToken) res.status(401).send('Access Token Required');
-    jwt.verify(accessToken, secret, (err, user) => {
+    let accessToken = req.headers.authorization;
+    if(!accessToken) return res.status(401).send('Access Token Required');
+    const accessTokenNoBearer = accessToken.split(' ')[1];
+    jwt.verify(accessTokenNoBearer || accessToken, secret, (err, user) => {
         err ?
             res.status(403).send('Invalid Access Token') :
             res.json({valid: true});
@@ -67,19 +74,20 @@ router.post('/users/tokenValidate', (req, res) => {
 
 // Access user info with token
 router.get('/api/v1/information', (req, res) => {
-    const accessToken = req.headers.Authorization;
-    if(!accessToken) res.status(401).send('Access Token Required');
-    jwt.verify(accessToken, secret, (err, user) => {
+    const accessToken = req.headers.authorization;
+    if(!accessToken) return res.status(401).send('Access Token Required');
+    const accessTokenNoBearer = accessToken.split(' ')[1];
+    jwt.verify(accessTokenNoBearer || accessToken, secret, (err, user) => {
         err ?
             res.status(403).send('Invalid Access Token') :
-            res.json({email: user.email, info: user.info});
+            res.json([{email: user.email, info: user.info}]);
     })
 })
 
 // Sends a new access token to a valid refresh token.
 router.post('/users/token', (req, res) => {
     const refreshToken = req.body.token;
-    if(!refreshToken) res.status(401).send('Refresh Token Required');
+    if(!refreshToken) return res.status(401).send('Refresh Token Required');
     REFRESHTOKENS.find(token => token === refreshToken) ?
         res.status(200).send(refreshToken) :
         res.status(403).send('Invalid Refresh Token');
@@ -88,7 +96,7 @@ router.post('/users/token', (req, res) => {
 // Logging out
 router.post('/users/logout', (req, res) => {
     const refreshToken = req.body.token;
-    if(!refreshToken) res.status(400).send('Refresh Token Required');
+    if(!refreshToken) return res.status(400).send('Refresh Token Required');
     let foundToken = false;
     REFRESHTOKENS.map(token => {
         if(token === refreshToken){
@@ -101,12 +109,13 @@ router.post('/users/logout', (req, res) => {
 
 // Sends users array for an admin token
 router.get('/api/v1/users', (req, res) => {
-    const accessToken = req.headers.Authorization;
-    if(!accessToken) res.status(401).send('Access Token Required');
-    jwt.verify(accessToken, secret, (err, user) => {
+    const accessToken = req.headers.authorization;
+    if(!accessToken) return res.status(401).send('Access Token Required');
+    const accessTokenNoBearer = accessToken.split(' ')[1];
+    jwt.verify(accessTokenNoBearer || accessToken, secret, (err, user) => {
         if(err) res.status(403).send('Invalid Access Token');
         user.isAdmin ?
-            res.json({USERS}) :
+            res.json(USERS) :
             res.status(403).send('Invalid Access Token');
     })
 })
