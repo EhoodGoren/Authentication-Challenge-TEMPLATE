@@ -28,6 +28,15 @@ router.use(async (req, res, next) => {
     next();
 })
 
+const routes = [
+    { method: "post", path: "/users/register", description: "Register, Required: email, name, password", example: { body: { email: "user@email.com", name: "user", password: "password" } } },
+    { method: "post", path: "/users/login", description: "Login, Required: valid email and password", example: { body: { email: "user@email.com", password: "password" } } },
+    { method: "post", path: "/users/token", description: "Renew access token, Required: valid refresh token", example: { headers: { token: "\*Refresh Token\*" } } },
+    { method: "post", path: "/users/tokenValidate", description: "Access Token Validation, Required: valid access token", example: { headers: { Authorization: "Bearer \*Access Token\*" } } },
+    { method: "get", path: "/api/v1/information", description: "Access user's information, Required: valid access token", example: { headers: { Authorization: "Bearer \*Access Token\*" } } },
+    { method: "post", path: "/users/logout", description: "Logout, Required: access token", example: { body: { token: "\*Refresh Token\*" } } },
+    { method: "get", path: "api/v1/users", description: "Get users DB, Required: Valid access token of admin user", example: { headers: { authorization: "Bearer \*Access Token\*" } } }
+];
 
 // Signing up to the server
 router.post('/users/register', async (req, res) => {
@@ -90,7 +99,7 @@ router.post('/users/token', (req, res) => {
     if(!refreshToken) return res.status(401).send('Refresh Token Required');
     if(REFRESHTOKENS.find(token => token === refreshToken)){
         const refreshTokenUser = jwt.verify(refreshToken, secret)
-        const accessToken = jwt.sign(refreshTokenUser, secret, {expiresIn:'10000'});
+        const accessToken = jwt.sign(refreshTokenUser, secret, {expiresIn:'12000'});
         res.json({accessToken})
     }
     else {
@@ -125,6 +134,19 @@ router.get('/api/v1/users', (req, res) => {
     })
 })
 
-router.options('/', /* stuff */)
+router.options('/', (req, res) => {
+    const accessToken = req.headers.authorization;
+    res.set('Allow', 'OPTIONS, GET, POST');
+    if(!accessToken) return res.json(routes.slice(0, 2));
+    const accessTokenNoBearer = accessToken.split(' ')[1];
+    jwt.verify(accessTokenNoBearer || accessToken, secret, (err, user) => {
+        if(err) return res.json(routes.slice(0, 3));
+        else {
+            user.isAdmin ?
+                res.json(routes.slice()) :
+                res.json(routes.slice(0,6));
+        }
+    })
+})
 
 module.exports = router;
