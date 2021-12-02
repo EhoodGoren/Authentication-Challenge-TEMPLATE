@@ -10,22 +10,27 @@ const INFORMATION = [];
 
 const REFRESHTOKENS = [];
 
+const secret = 'ktuKOD6zt6';
 
-const admin = {
-    email: "admin@email.com",
-    name: "admin",
-    password: encrpytPassword('Rc123456!'),
-    isAdmin: true
+const addAdmin = async () => {
+    const admin = {
+        email: "admin@email.com",
+        name: "admin",
+        password: await encrpytPassword('Rc123456!'),
+        isAdmin: true
+    }
+    USERS.push(admin);
 }
+addAdmin();
 
 // Signing up to the server
-router.post('/users/register', (req, res) => {
-    const { email, user, password } = req.body;
+router.post('/users/register', async (req, res) => {
+    const { email, name, password } = req.body;
     // If user name isn't taken yet
-    if(USERS.every(_user => _user.user !== user)){
-        const encrpytedPassword = encrpytPassword(password);
-        USERS.push({ email, name: user, password, isAdmin: false });
-        INFORMATION.push({email, info: `${user} info`});
+    if(USERS.every(user => user.name !== name)){
+        const encrpytedPassword = await encrpytPassword(password);
+        USERS.push({ email, name, password: encrpytedPassword, isAdmin: false });
+        INFORMATION.push({email, info: `${name} info`});
         res.status(201).send('Register Success');
     }
     else {
@@ -34,15 +39,15 @@ router.post('/users/register', (req, res) => {
 })
 
 // Logging in to the server
-router.post('/users/login', (req, res) => {
+router.post('/users/login', async (req, res) => {
     const { email, password } = req.body;
     const loginUser = USERS.find(user => user.email === email);
     if(!loginUser) res.status(404).send('cannot find user');
-    if(checkDecrypt(password, loginUser.password)){
-        const accessToken = jwt.sign(loginUser.user, secret);
+    if(await checkDecrypt(`${password}`, `${loginUser.password}`)){
+        const accessToken = jwt.sign(loginUser.name, secret);
         const refreshToken = accessToken;
         REFRESHTOKENS.push(refreshToken);
-        res.status(200).json({accessToken, refreshToken, email, name: loginUser.user, isAdmin: false});
+        res.status(200).json({accessToken, refreshToken, email, name: loginUser.name, isAdmin: false});
     }
     else {
         res.status(403).send('User or Password incorrect');

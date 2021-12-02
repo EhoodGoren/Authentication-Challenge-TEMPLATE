@@ -1,14 +1,12 @@
 const bcrypt = require('bcrypt');
 const saltRounds = 10;
 
-function encrpytPassword(password) {
-    return bcrypt.genSalt(saltRounds, (err, salt) => {
-        bcrypt.hash(password, salt, (err, hash) => hash)
-    });
+async function encrpytPassword(password) {
+    return await bcrypt.hash(`${password}`, saltRounds);
 }
 
-function checkDecrypt(password, hash) {
-    return bcrypt.compare(password, hash, (err, result) => result);
+async function checkDecrypt(password, hash) {
+    return await bcrypt.compare(`${password}`, `${hash}`);
 }
 
 module.exports = {

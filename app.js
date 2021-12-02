@@ -4,7 +4,7 @@ const usersRouter = require('./backend/routers/usersRouter');
 
 const app = express();
 app.use(express.json());
-app.use(morgan());
+app.use(morgan('tiny'));
 
 app.use('/', usersRouter);
 
