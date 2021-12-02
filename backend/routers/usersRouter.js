@@ -50,8 +50,8 @@ router.post('/users/login', async (req, res) => {
     const loginUser = USERS.find(user => user.email === email);
     if(!loginUser) return res.status(404).send('cannot find user');
     if(await checkDecrypt(`${password}`, `${loginUser.password}`)){
-        const accessToken = jwt.sign(loginUser, secret);
-        const refreshToken = accessToken;
+        const accessToken = jwt.sign(loginUser, secret, {expiresIn: '10000'});
+        const refreshToken = jwt.sign(loginUser, secret);
         REFRESHTOKENS.push(refreshToken);
         res.status(200).json({accessToken, refreshToken, email, name: loginUser.name, isAdmin: loginUser.isAdmin});
     }
@@ -88,9 +88,14 @@ router.get('/api/v1/information', (req, res) => {
 router.post('/users/token', (req, res) => {
     const refreshToken = req.body.token;
     if(!refreshToken) return res.status(401).send('Refresh Token Required');
-    REFRESHTOKENS.find(token => token === refreshToken) ?
-        res.status(200).send(refreshToken) :
+    if(REFRESHTOKENS.find(token => token === refreshToken)){
+        const refreshTokenUser = jwt.verify(refreshToken, secret)
+        const accessToken = jwt.sign(refreshTokenUser, secret, {expiresIn:'10000'});
+        res.json({accessToken})
+    }
+    else {
         res.status(403).send('Invalid Refresh Token');
+    }
 })
 
 // Logging out
