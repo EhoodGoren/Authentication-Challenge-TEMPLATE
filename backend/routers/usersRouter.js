@@ -86,15 +86,17 @@ router.post('/users/token', (req, res) => {
 })
 
 // Logging out
-router.post('users/logout', (req, res) => {
+router.post('/users/logout', (req, res) => {
     const refreshToken = req.body.token;
     if(!refreshToken) res.status(400).send('Refresh Token Required');
+    let foundToken = false;
     REFRESHTOKENS.map(token => {
         if(token === refreshToken){
+            foundToken = true;
             res.send('User Logged Out Successfully');
         }
     })
-    res.status(400).send('Invalid Refresh Token');
+    if(!foundToken) res.status(400).send('Invalid Refresh Token');
 })
 
 // Sends users array for an admin token
